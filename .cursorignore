@@ -1,0 +1,59 @@
+# 依赖目录
+node_modules/
+dist/
+.nuxt/
+.output/
+.pnpm-store/
+.pnpm-cache/
+.data/
+
+# 编译输出
+
+*.lock
+.DS_Store
+
+# 编辑器目录
+.idea/
+.vscode/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# 缓存文件
+.cache/
+.temp/
+.eslintcache
+.stylelintcache
+.npm
+
+# 构建文件
+stats.html
+stats.json
+report.html
+coverage/
+
+# 临时文件
+*.tmp
+*.temp
+*.bak
+*.swp
+
+# 大型二进制文件
+*.zip
+*.tar.gz
+*.tgz
+*.rar
+*.7z
+*.mp4
+*.mp3
+*.wav
+*.avi
+*.mov
+*.wmv
+*.flv
+
+# 系统文件
+Thumbs.db
+desktop.ini

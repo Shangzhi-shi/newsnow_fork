@@ -1,0 +1,48 @@
+# <type>(<scope>): <subject>
+# |      |         |
+# |      |         +-> 提交的简短描述，不超过50个字符
+# |      |
+# |      +-> 影响范围
+# |
+# +-> 提交类型: 
+#     feat:     新功能
+#     fix:      修复Bug
+#     docs:     文档变更
+#     style:    代码格式调整，不影响代码含义(空格、格式、缺少分号等)
+#     refactor: 代码重构，既不修复错误也不添加功能
+#     perf:     性能优化
+#     test:     添加或修改测试代码
+#     build:    构建工具或外部依赖包的修改
+#     ci:       CI配置、脚本的修改
+#     chore:    不修改src或测试文件的其他修改
+#     revert:   回滚之前的提交
+
+# 范围(scope)示例: 建议使用变动的目录或模块名
+#     src/components:   前端组件相关
+#     src/routes:       路由相关
+#     src/atoms:        状态管理相关
+#     src/hooks:        React Hooks相关
+#     server/api:       后端API相关
+#     server/sources:   新闻源相关
+#     server/database:  数据库相关
+#     shared:           前后端共享代码相关
+#     config:           配置文件相关
+
+
+# 详细描述 (可选，描述动机，与之前行为的对比)
+
+# 破坏性变更 (可选)
+
+# 关联提交 (可选)
+# 示例:
+# Related to: #123, #456
+# Closes: #789
+
+# 完整示例:
+# feat(server/sources): 添加财经新闻数据源
+# 
+# 实现了财经新闻的爬取和解析功能，支持以下网站:
+# - 东方财富网
+# - 华尔街见闻
+# 
+# Issue #123

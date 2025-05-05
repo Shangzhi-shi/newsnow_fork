@@ -1,0 +1,13 @@
+{
+    "mcpServers": {
+      "filesystem": {
+        "command": "cmd",
+        "args": [
+          "/c",
+          "npx",
+          "@modelcontextprotocol/server-filesystem",
+          "D:\\Code\\project\\newsNow_fork_dev"
+        ]
+      }
+    }
+}
