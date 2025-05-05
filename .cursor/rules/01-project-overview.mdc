@@ -1,0 +1,52 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# NewsNow 项目概述
+
+## 项目简介
+NewsNow 是一个实时热点新闻聚合阅读应用，提供干净优雅的阅读体验。该项目支持 GitHub OAuth 登录、数据同步、新闻缓存与实时更新等功能。
+
+**注意：本项目是从 ourongxing/newsnow fork 出来的二次开发项目。当前的开发工作暂不计划提交回原仓库。所有开发工作都应在 `dev` 分支上进行。**
+
+## 技术栈
+- 前端：React 19、Vite、Jotai (状态管理)、UnoCSS、TanStack Router
+- 后端：Nitro、D1/SQLite 数据库
+- 部署：支持 Cloudflare Pages、Vercel、Docker
+
+## 项目结构
+主要目录结构说明：
+
+- `/src`: 前端源代码
+  - `/components`: React 组件
+  - `/routes`: 路由定义
+  - `/atoms`: Jotai 原子状态
+  - `/hooks`: 自定义 React Hooks
+  - `/utils`: 前端工具函数
+  - `/styles`: 样式文件
+
+- `/server`: 后端源代码
+  - `/api`: API 端点定义
+  - `/database`: 数据库相关代码
+  - `/middleware`: 中间件
+  - `/sources`: 新闻源爬取实现
+  - `/utils`: 后端工具函数
+
+- `/shared`: 前后端共享代码
+
+## 分支说明
+- `main`: 主分支，与原仓库保持最大兼容性
+- `dev`: 开发分支，所有的二次开发工作都在此分支上进行
+
+## 主要入口文件
+- 项目配置: [vite.config.ts](mdc:vite.config.ts) - Vite 构建配置
+- 后端配置: [nitro.config.ts](mdc:nitro.config.ts) - Nitro 服务配置
+- 前端入口: [src/routes/__root.tsx](mdc:src/routes/__root.tsx) - 主应用路由
+- 应用信息: [README.md](mdc:README.md) - 项目说明文档
+
+
+
+
+
+

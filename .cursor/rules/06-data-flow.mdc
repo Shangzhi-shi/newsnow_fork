@@ -1,0 +1,42 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# NewsNow 数据流与处理
+
+## 新闻数据流
+
+### 数据源处理
+1. 定义源: 源元数据在 [shared/sources](mdc:shared/sources/) 中定义
+2. 爬取实现: 爬取逻辑在 [server/sources](mdc:server/sources/) 目录实现
+3. 爬取调度: 根据配置的时间间隔定期爬取和更新
+
+### 数据存储
+1. 数据库存储: 新闻数据存储在 SQLite 或 D1 数据库
+2. 缓存机制: 默认 30 分钟缓存时间，登录用户可强制刷新
+3. 自适应爬取: 根据源更新频率自动调整爬取间隔（最小 2 分钟）
+
+### 前端数据流
+1. API 请求: 前端通过 API 获取新闻数据 ([server/api/s/](mdc:server/api/s/))
+2. 状态管理: 使用 Jotai 存储和管理新闻数据
+3. 数据呈现: 通过组件渲染新闻列和卡片
+
+## 用户数据流
+
+### 认证流程
+1. OAuth 流程: 通过 GitHub OAuth 进行用户认证
+2. 令牌管理: 使用 JWT 进行身份验证
+3. 用户信息: 存储在数据库和前端状态中
+
+### 用户设置
+1. 设置存储: 用户设置存储在数据库中
+2. 本地存储: 部分设置使用 `atomWithStorage` 持久化到本地
+3. 数据同步: 登录用户可在多设备同步设置和阅读状态
+
+## 关键数据处理文件
+- 新闻处理: [server/sources/cls/news.ts](mdc:server/sources/cls/news.ts)
+- 用户数据: [server/api/me/index.ts](mdc:server/api/me/index.ts)
+- 数据库模型: [server/database/models.ts](mdc:server/database/models.ts)
+- 前端状态: [src/atoms/index.ts](mdc:src/atoms/index.ts)
+

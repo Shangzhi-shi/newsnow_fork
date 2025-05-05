@@ -1,0 +1,42 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# NewsNow 前端架构
+
+## 组件结构
+NewsNow 使用 React 构建，组件按照功能模块组织：
+
+- `src/components/column`: 新闻列展示相关组件
+- `src/components/common`: 通用组件库，如拖拽功能、滚动条、搜索栏等
+- `src/components/header`: 应用头部组件，包含导航和操作按钮
+- `src/components/navbar.tsx`: 导航栏组件
+- `src/components/footer.tsx`: 页脚组件
+
+## 路由系统
+使用 TanStack Router (原 React Location) 实现路由，主要路由文件：
+
+- [src/routes/__root.tsx](mdc:src/routes/__root.tsx): 根路由组件
+- [src/routes/index.tsx](mdc:src/routes/index.tsx): 主页路由
+- [src/routes/c.$column.tsx](mdc:src/routes/c.$column.tsx): 单列展示路由（动态路由）
+
+## 状态管理
+使用 Jotai 管理全局状态：
+
+- `src/atoms/`: 包含所有状态原子定义
+- 状态可借助 `atomWithStorage` 实现持久化
+
+## CSS 样式
+采用 UnoCSS 实现 Atomic CSS，提供高效的样式开发体验：
+
+- 样式配置在 [uno.config.ts](mdc:uno.config.ts) 中定义
+- 全局样式在 `src/styles` 目录下
+- 组件样式直接使用 UnoCSS 原子类或框架内置组件
+
+## 工具函数
+通用工具函数集中在：
+
+- `src/utils/`: 前端专用工具函数
+- `shared/`: 前后端共享工具函数和类型
+

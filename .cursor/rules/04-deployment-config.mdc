@@ -1,0 +1,54 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# NewsNow 部署与环境配置
+
+## 环境变量
+关键环境变量配置（参考 [example.env.server](mdc:example.env.server)）：
+
+- `G_CLIENT_ID`: GitHub OAuth 客户端 ID
+- `G_CLIENT_SECRET`: GitHub OAuth 客户端密钥
+- `JWT_SECRET`: JWT 签名密钥
+- `INIT_TABLE`: 是否初始化数据库表（首次运行设为 true）
+- `ENABLE_CACHE`: 是否启用缓存
+
+## 部署方式
+
+### Cloudflare Pages 部署
+推荐部署方式：
+
+- 构建命令: `pnpm run build`
+- 输出目录: `dist/output/public`
+- 环境变量设置在 Cloudflare Pages 后台
+- 需要配置 D1 数据库，参考 [example.wrangler.toml](mdc:example.wrangler.toml)
+
+### Vercel 部署
+支持 Vercel Edge Functions：
+
+- 自动检测 Vercel 环境
+- 需要通过环境变量配置外部数据库
+
+### Docker 部署
+本地或服务器部署：
+
+- 使用 [docker-compose.yml](mdc:docker-compose.yml) 配置
+- 命令: `docker compose up`
+- 可在 docker-compose.yml 中设置环境变量
+
+## 数据库配置
+支持多种数据库引擎：
+
+- SQLite: 本地开发默认选择 (better-sqlite3)
+- Cloudflare D1: 推荐生产环境使用
+- 其他支持的数据库连接器: 参考 https://db0.unjs.io/connectors
+
+## OAuth 配置
+GitHub OAuth 配置步骤：
+
+1. 创建 GitHub App
+2. 回调 URL 设置为: `https://your-domain.com/api/oauth/github`
+3. 获取 Client ID 和 Client Secret
+4. 配置到环境变量
+

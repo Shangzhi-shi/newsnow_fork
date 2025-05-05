@@ -1,0 +1,49 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# NewsNow 后端架构
+
+## 后端框架
+NewsNow 使用 Nitro 作为服务端框架，支持多种部署环境：
+
+- Node.js 服务器
+- Cloudflare Pages
+- Vercel Edge Functions
+- Bun 运行时
+
+## API 结构
+API 端点定义在 `server/api/` 目录下：
+
+- [server/api/me/](mdc:server/api/me): 用户相关 API
+- [server/api/oauth/](mdc:server/api/oauth): OAuth 认证 API
+- [server/api/proxy/](mdc:server/api/proxy): 代理服务 API
+- [server/api/s/](mdc:server/api/s): 数据源服务 API
+
+## 数据库结构
+使用 `db0` 作为数据库抽象层，支持多种数据库引擎：
+
+- [server/database/](mdc:server/database): 数据库模型和操作
+- 默认使用 SQLite (better-sqlite3)
+- 云部署支持 Cloudflare D1 数据库
+
+## 新闻源处理
+新闻源爬取和处理逻辑：
+
+- [server/sources/](mdc:server/sources): 新闻源爬取实现
+  - [server/sources/cls/](mdc:server/sources/cls): 新闻源基类和通用实现
+  - [server/sources/coolapk/](mdc:server/sources/coolapk): 特定新闻源实现示例
+
+## 中间件
+API 中间件定义：
+
+- [server/middleware/](mdc:server/middleware): 中间件定义
+- 包含认证、缓存、错误处理等中间件
+
+## 工具函数
+服务端工具函数：
+
+- [server/utils/](mdc:server/utils): 服务端工具函数
+- [shared/](mdc:shared): 前后端共享工具函数和常量
+

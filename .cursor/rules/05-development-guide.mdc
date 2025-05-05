@@ -1,0 +1,90 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# NewsNow 开发指南
+
+## 开发环境设置
+
+### 环境要求
+- Node.js >= 20
+- PNPM 包管理器
+
+### 开发流程
+1. 克隆代码库
+2. 启用 corepack: `corepack enable`
+3. 安装依赖: `pnpm i`
+4. 配置环境变量: 复制 `example.env.server` 为 `.env.server` 并填写
+5. 切换到开发分支: `git checkout dev`
+6. 启动开发服务器: `pnpm dev`
+
+## 代码规范
+
+### TypeScript 配置
+项目使用严格的 TypeScript 检查：
+- 基础配置: [tsconfig.base.json](mdc:tsconfig.base.json)
+- 应用配置: [tsconfig.app.json](mdc:tsconfig.app.json)
+- Node 配置: [tsconfig.node.json](mdc:tsconfig.node.json)
+
+### ESLint 配置
+使用 ESLint 进行代码检查：
+- 配置文件: [eslint.config.mjs](mdc:eslint.config.mjs)
+- 提交前自动检查: 使用 simple-git-hooks 和 lint-staged
+
+## 二次开发说明
+
+### 与原仓库的关系
+本项目是从 ourongxing/newsnow fork 出来的二次开发项目。当前的主要目标是在原有功能基础上进行定制化开发，而不是向原仓库贡献代码。
+
+### 分支策略
+- `main` 分支：与原仓库保持兼容性的分支
+- `dev` 分支：主要开发分支，所有开发工作都应在该分支上进行
+
+### 与原仓库同步
+如需从原仓库获取最新更新，可以按照以下步骤操作：
+
+1. 确保你在正确的分支上（如需同步到开发分支，请确保在 `dev` 分支上）:
+   ```bash
+   git checkout dev
+   ```
+
+2. 添加原仓库作为远程仓库（如果尚未添加）:
+   ```bash
+   git remote add upstream https://github.com/ourongxing/newsnow.git
+   ```
+
+3. 获取原仓库最新代码:
+   ```bash
+   git fetch upstream
+   ```
+
+4. 合并原仓库更新到当前分支:
+   ```bash
+   git merge upstream/main
+   ```
+   
+5. 解决可能的冲突并提交更改
+
+### 添加新闻源
+参考 [CONTRIBUTING.md](mdc:CONTRIBUTING.md) 了解如何添加新闻源：
+
+1. 在 `shared/sources` 中定义源元数据
+2. 在 `server/sources` 中实现爬取逻辑
+3. 参考现有实现，如 `server/sources/coolapk`
+
+## 测试
+使用 Vitest 进行测试：
+- 测试配置: [vitest.config.ts](mdc:vitest.config.ts)
+- 运行测试: `pnpm test`
+
+## 构建与发布
+- 构建项目: `pnpm build`
+- 项目使用 bumpp 进行版本管理
+- 使用 GitHub Actions 进行 CI/CD
+
+
+
+
+
+
