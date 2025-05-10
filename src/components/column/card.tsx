@@ -138,7 +138,12 @@ function NewsCard({ id, setHandleRef }: NewsCardProps) {
           />
           <button
             type="button"
-            className={$("btn", isFocused ? "i-ph:star-fill" : "i-ph:star-duotone")}
+            className={$(
+              "btn",
+              isFocused
+                ? "i-ph:star-fill text-red-600 dark:text-yellow-400 opacity-100"
+                : "i-ph:star-duotone",
+            )}
             onClick={toggleFocus}
           />
           {/* firefox cannot drag a button */}
