@@ -133,7 +133,12 @@ function NewsCard({ id, setHandleRef }: NewsCardProps) {
         <div className={$("flex gap-2 text-lg", `color-${sources[id].color}`)}>
           <button
             type="button"
-            className={$("btn i-ph:arrow-counter-clockwise-duotone", isFetching && "animate-spin i-ph:circle-dashed-duotone")}
+            className={$(
+              "btn",
+              "i-ph:arrow-counter-clockwise-duotone",
+              "btn-icon-default",
+              isFetching && "animate-spin i-ph:circle-dashed-duotone",
+            )}
             onClick={() => refresh(id)}
           />
           <button
@@ -142,7 +147,7 @@ function NewsCard({ id, setHandleRef }: NewsCardProps) {
               "btn",
               isFocused
                 ? "i-ph:star-fill text-red-600 dark:text-yellow-400 opacity-100"
-                : "i-ph:star-duotone",
+                : "i-ph:star-duotone btn-icon-default",
             )}
             onClick={toggleFocus}
           />
@@ -150,7 +155,12 @@ function NewsCard({ id, setHandleRef }: NewsCardProps) {
           {setHandleRef && (
             <div
               ref={setHandleRef}
-              className={$("btn", "i-ph:dots-six-vertical-duotone", "cursor-grab")}
+              className={$(
+                "btn",
+                "i-ph:dots-six-vertical-duotone",
+                "btn-icon-default",
+                "cursor-grab",
+              )}
             />
           )}
         </div>
