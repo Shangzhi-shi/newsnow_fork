@@ -29,16 +29,6 @@ export const currentSourcesAtom = atom((get) => {
     return metadataData[id] || []
   }
 
-  // 获取当前分类的所有源，确保存在
-  const categorySourcesList = metadataData[id] || []
-  // 获取收藏的源
-  const focusSources = get(focusSourcesAtom)
-
-  // 如果没有收藏的源，直接返回当前分类所有源
-  if (!focusSources.length) {
-    return categorySourcesList
-  }
-
   /**
    * 判断信息源是否属于指定分类
    */
@@ -53,21 +43,38 @@ export const currentSourcesAtom = atom((get) => {
     )
   }
 
-  // 创建一个收藏源的Set，提高查找效率
+  const focusSources = get(focusSourcesAtom)
   const focusSourcesSet = new Set(focusSources)
+  const savedOrderForCurrentCategory = metadataData[id] || []
 
-  // 找出当前分类中被收藏的源
-  const focusedSourcesInCategory = focusSources.filter(
-    sourceId => isSourceInCategory(sourceId, id),
+  // 主要逻辑：有已保存顺序，也有收藏源
+  const orderedFocusedSources: SourceID[] = []
+  const orderedRestSources: SourceID[] = []
+
+  for (const sourceId of savedOrderForCurrentCategory) {
+    if (!isSourceInCategory(sourceId, id)) {
+      continue // 如果不是当前分类的，就跳过
+    }
+
+    if (focusSourcesSet.has(sourceId)) {
+      orderedFocusedSources.push(sourceId)
+    } else {
+      orderedRestSources.push(sourceId)
+    }
+  }
+
+  // 处理那些已收藏、属于当前分类，但可能还未出现在 savedOrderForCurrentCategory 中的源 (例如新收藏的)
+  // 这些新收藏的源应该被添加到 orderedFocusedSources 的末尾 (或头部，或根据 focusSources 顺序插入)
+  // 为了简单起见，并保持与 focusSourcesAtom 顺序的一致性，我们将它们按 focusSourcesAtom 的顺序加入
+  const currentSavedFocusedSet = new Set(orderedFocusedSources) // 已在 savedOrder 中找到的收藏源
+  const newFocusedSourcesInThisCategory = focusSources.filter(
+    focusedSourceId =>
+      isSourceInCategory(focusedSourceId, id)
+      && !currentSavedFocusedSet.has(focusedSourceId),
   )
 
-  // 从当前分类列表中移除被收藏的源，避免重复
-  const restSources = categorySourcesList.filter(
-    sourceId => !focusSourcesSet.has(sourceId),
-  )
-
-  // 收藏的源放在前面，其他源放在后面
-  return [...focusedSourcesInCategory, ...restSources]
+  // 组合：已保存顺序中的收藏源 + 新加入的收藏源 + 已保存顺序中的非收藏源
+  return [...orderedFocusedSources, ...newFocusedSourcesInThisCategory, ...orderedRestSources]
 }, (get, set, update: Update<SourceID[]>) => {
   const _ = update instanceof Function ? update(get(currentSourcesAtom)) : update
   set(primitiveMetadataAtom, {
