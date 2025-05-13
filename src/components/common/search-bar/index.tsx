@@ -1,10 +1,15 @@
 import { Command } from "cmdk"
-import { useDebounce, useMount } from "react-use"
+import { useMount } from "react-use"
 import type { SourceID } from "@shared/types"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import pinyin from "@shared/pinyin.json"
+import { sources } from "@shared/sources"
+import { columns } from "@shared/metadata"
+import { typeSafeObjectEntries } from "@shared/type.util"
 import { OverlayScrollbar } from "../overlay-scrollbar"
 import { CardWrapper } from "~/components/column/card"
+import { useSearchBar } from "~/hooks/useSearch"
+import { useFocusWith } from "~/hooks/useFocus"
 
 import "./cmdk.css"
 
@@ -14,6 +19,12 @@ interface SourceItemProps {
   title?: string
   column: any
   pinyin: string
+}
+
+interface ProcessedGroupData {
+  column: string
+  sources: SourceItemProps[]
+  allGroupKeywords: string[]
 }
 
 function groupByColumn(items: SourceItemProps[]) {
@@ -35,35 +46,46 @@ function groupByColumn(items: SourceItemProps[]) {
 }
 
 const LOCAL_STORAGE_EXPANDED_GROUPS_KEY = "searchBarExpandedGroups"
-const SEARCH_DEBOUNCE_DELAY = 250 // ms
 
 export function SearchBar() {
   const { opened, toggle } = useSearchBar()
-  const sourceItems = useMemo(
-    () =>
-      groupByColumn(typeSafeObjectEntries(sources)
-        .filter(([_, source]) => !source.redirect)
-        .map(([k, source]) => {
-          const columnId = source.column as keyof typeof columns | undefined
-          let columnName = "未分类"
-          if (columnId && columns[columnId]) {
-            columnName = columns[columnId].zh
-          }
-          return {
-            id: k,
-            title: source.title,
-            column: columnName,
-            name: source.name,
-            pinyin: pinyin?.[k as keyof typeof pinyin] ?? "",
-          }
-        })),
-    [],
-  )
+  const sourceItems = useMemo((): ProcessedGroupData[] => {
+    const rawMappedItems = typeSafeObjectEntries(sources)
+      .filter(([_, source]) => !source.redirect)
+      .map(([k, source]) => {
+        const columnId = source.column as keyof typeof columns | undefined
+        let columnName = "未分类"
+        if (columnId && columns[columnId]) {
+          columnName = columns[columnId].zh
+        }
+        return {
+          id: k,
+          title: source.title,
+          column: columnName,
+          name: source.name,
+          pinyin: pinyin?.[k as keyof typeof pinyin] ?? "",
+        }
+      })
+
+    const groupedByColumnData = groupByColumn(rawMappedItems)
+
+    return groupedByColumnData.map(group => ({
+      ...group,
+      allGroupKeywords: [
+        group.column,
+        ...group.sources.flatMap(item => [
+          item.name,
+          item.title ?? "",
+          item.pinyin,
+        ]).filter(Boolean),
+      ] as string[],
+    }))
+  }, [])
+
   const inputRef = useRef<HTMLInputElement | null>(null)
 
   const [value, setValue] = useState<SourceID>("github-trending-today")
   const [currentInputValue, setCurrentInputValue] = useState("")
-  const [debouncedSearchValue, setDebouncedSearchValue] = useState("")
 
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>(() => {
     try {
@@ -74,15 +96,6 @@ export function SearchBar() {
     }
   })
 
-  // Debounce the search input
-  useDebounce(
-    () => {
-      setDebouncedSearchValue(currentInputValue)
-    },
-    SEARCH_DEBOUNCE_DELAY,
-    [currentInputValue],
-  )
-
   useEffect(() => {
     try {
       localStorage.setItem(LOCAL_STORAGE_EXPANDED_GROUPS_KEY, JSON.stringify(expandedGroups))
@@ -90,33 +103,6 @@ export function SearchBar() {
       console.error("Failed to save expandedGroups to localStorage", error)
     }
   }, [expandedGroups])
-
-  // Auto-expand groups on debounced search
-  useEffect(() => {
-    if (debouncedSearchValue.trim()) {
-      const lowerSearch = debouncedSearchValue.toLowerCase()
-
-      const newExpandedGroups = { ...expandedGroups }
-      let hasChanges = false
-
-      sourceItems.forEach(({ column, sources: groupSources }) => {
-        const hasMatch = groupSources.some(item =>
-          item.name.toLowerCase().includes(lowerSearch)
-          || (item.title && item.title.toLowerCase().includes(lowerSearch))
-          || (item.pinyin && item.pinyin.toLowerCase().includes(lowerSearch)),
-        )
-
-        if (hasMatch && !newExpandedGroups[column]) {
-          newExpandedGroups[column] = true
-          hasChanges = true
-        }
-      })
-
-      if (hasChanges) {
-        setExpandedGroups(newExpandedGroups)
-      }
-    }
-  }, [debouncedSearchValue, sourceItems, expandedGroups, setExpandedGroups])
 
   const toggleGroup = useCallback((groupName: string) => {
     setExpandedGroups(prev => ({
@@ -191,8 +177,20 @@ export function SearchBar() {
               <Command.Empty>无匹配分类或新闻源</Command.Empty>
             )}
             {
-              sourceItems.map(({ column, sources: groupSources }) => {
+              sourceItems.map(({ column, sources: groupSources, allGroupKeywords }) => {
                 const isExpanded = expandedGroups[column] ?? false
+                let groupIsSearchResult = false
+                const trimmedInput = currentInputValue.trim()
+                if (trimmedInput) {
+                  const lowerSearch = trimmedInput.toLowerCase()
+                  groupIsSearchResult = column.toLowerCase().includes(lowerSearch)
+                    || groupSources.some(item =>
+                      item.name.toLowerCase().includes(lowerSearch)
+                      || (item.title && item.title.toLowerCase().includes(lowerSearch))
+                      || (item.pinyin && item.pinyin.toLowerCase().includes(lowerSearch)),
+                    )
+                }
+
                 return (
                   <Command.Group
                     key={column}
@@ -203,6 +201,8 @@ export function SearchBar() {
                       role="button"
                       tabIndex={0}
                       aria-expanded={isExpanded}
+                      aria-controls={`group-${column}`}
+                      aria-label={`${column} 分类${isExpanded ? "，已展开" : "，已折叠"}`}
                       onKeyDown={(e) => {
                         if (e.key === "Enter" || e.key === " ") {
                           e.preventDefault()
@@ -215,12 +215,23 @@ export function SearchBar() {
                         cmdk-group-toggle-indicator=""
                         data-expanded={isExpanded}
                         className="i-ph:caret-right w-4 h-4"
-                      >
-                      </span>
+                      />
                     </div>
                     {isExpanded && groupSources.map(item => (
                       <SourceItem item={item} key={item.id} />
                     ))}
+                    {!isExpanded && groupIsSearchResult && (
+                      <Command.Item
+                        key={`${column}-ghost`}
+                        value={`${column}-ghost-placeholder`}
+                        className="!hidden"
+                        keywords={allGroupKeywords}
+                        disabled
+                        onSelect={() => toggleGroup(column)}
+                      >
+                        {column}
+                      </Command.Item>
+                    )}
                   </Command.Group>
                 )
               })
@@ -241,7 +252,7 @@ function SourceItem({ item }: {
   const { isFocused, toggleFocus } = useFocusWith(item.id)
   return (
     <Command.Item
-      keywords={[item.name, item.title ?? "", item.pinyin]}
+      keywords={[item.name, item.title ?? "", item.pinyin, item.column].filter(Boolean) as string[]}
       value={item.id}
       className="flex justify-between items-center p-2"
       onSelect={toggleFocus}
@@ -262,8 +273,7 @@ function SourceItem({ item }: {
             ? "i-ph:star-fill text-red-600 dark:text-yellow-400 opacity-100"
             : "i-ph:star-duotone bg-primary op-40",
         )}
-      >
-      </span>
+      />
     </Command.Item>
   )
 }
