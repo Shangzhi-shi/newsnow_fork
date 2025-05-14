@@ -10,6 +10,7 @@ import { OverlayScrollbar } from "../overlay-scrollbar"
 import { CardWrapper } from "~/components/column/card"
 import { useSearchBar } from "~/hooks/useSearch"
 import { useFocusWith } from "~/hooks/useFocus"
+import { useTextHighlight } from "~/hooks/useTextHighlight"
 
 import "./cmdk.css"
 
@@ -46,6 +47,90 @@ function groupByColumn(items: SourceItemProps[]) {
 }
 
 const LOCAL_STORAGE_EXPANDED_GROUPS_KEY = "searchBarExpandedGroups"
+
+interface ColumnGroupDisplayProps {
+  column: string
+  groupSources: SourceItemProps[]
+  allGroupKeywords: string[]
+  isExpanded: boolean
+  trimmedQuery: string
+  toggleGroup: (columnName: string) => void
+}
+
+function ColumnGroupDisplay({
+  column,
+  groupSources,
+  allGroupKeywords,
+  isExpanded,
+  trimmedQuery,
+  toggleGroup,
+}: ColumnGroupDisplayProps) {
+  const columnSegments = useTextHighlight(column, trimmedQuery)
+
+  let groupIsSearchResult = false
+  if (trimmedQuery) {
+    const lowerSearch = trimmedQuery.toLowerCase()
+    groupIsSearchResult
+      = column.toLowerCase().includes(lowerSearch)
+        || groupSources.some(
+          item =>
+            item.name.toLowerCase().includes(lowerSearch)
+            || (item.title && item.title.toLowerCase().includes(lowerSearch))
+            || (item.pinyin && item.pinyin.toLowerCase().includes(lowerSearch)),
+        )
+  }
+
+  return (
+    <Command.Group key={column}>
+      <div
+        className="flex items-center justify-between cursor-pointer p-2 cmdk-group-heading"
+        onClick={() => toggleGroup(column)}
+        role="button"
+        tabIndex={0}
+        aria-expanded={isExpanded}
+        aria-controls={`group-${column}`}
+        aria-label={`${column} 分类${isExpanded ? "，已展开" : "，已折叠"}`}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault()
+            toggleGroup(column)
+          }
+        }}
+      >
+        <span>
+          {columnSegments.map((segment, i) => (
+            <span
+              key={`col-seg-${column}-${i}-${segment.text.slice(0, 5)}`}
+              className={segment.isMatch ? "bg-yellow-300 dark:bg-yellow-500 text-black rounded-sm px-0.5 transition-colors duration-200" : ""}
+            >
+              {segment.text}
+            </span>
+          ))}
+        </span>
+        <span
+          cmdk-group-toggle-indicator=""
+          data-expanded={isExpanded}
+          className="i-ph:caret-right w-4 h-4"
+        />
+      </div>
+      {isExpanded && groupSources.map(item => (
+        <SourceItem item={item} key={item.id} query={trimmedQuery} />
+      ))}
+      {!isExpanded && groupIsSearchResult && (
+        <Command.Item
+          key={`${column}-ghost`}
+          value={`${column}-ghost-placeholder`}
+          className="!hidden"
+          keywords={allGroupKeywords}
+          disabled
+          onSelect={() => toggleGroup(column)}
+        >
+          {column}
+        </Command.Item>
+      )}
+    </Command.Group>
+  )
+}
 
 export function SearchBar() {
   const { opened, toggle } = useSearchBar()
@@ -86,6 +171,17 @@ export function SearchBar() {
 
   const [value, setValue] = useState<SourceID>("github-trending-today")
   const [currentInputValue, setCurrentInputValue] = useState("")
+  const [debouncedQuery, setDebouncedQuery] = useState("")
+
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedQuery(currentInputValue.trim())
+    }, 300)
+
+    return () => {
+      clearTimeout(handler)
+    }
+  }, [currentInputValue])
 
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>(() => {
     try {
@@ -173,68 +269,21 @@ export function SearchBar() {
                 </button>
               </div>
             </div>
-            {currentInputValue.trim() !== "" && (
+            {debouncedQuery !== "" && (
               <Command.Empty>无匹配分类或新闻源</Command.Empty>
             )}
             {
-              sourceItems.map(({ column, sources: groupSources, allGroupKeywords }) => {
-                const isExpanded = expandedGroups[column] ?? false
-                let groupIsSearchResult = false
-                const trimmedInput = currentInputValue.trim()
-                if (trimmedInput) {
-                  const lowerSearch = trimmedInput.toLowerCase()
-                  groupIsSearchResult = column.toLowerCase().includes(lowerSearch)
-                    || groupSources.some(item =>
-                      item.name.toLowerCase().includes(lowerSearch)
-                      || (item.title && item.title.toLowerCase().includes(lowerSearch))
-                      || (item.pinyin && item.pinyin.toLowerCase().includes(lowerSearch)),
-                    )
-                }
-
-                return (
-                  <Command.Group
-                    key={column}
-                  >
-                    <div
-                      className="flex items-center justify-between cursor-pointer p-2 cmdk-group-heading"
-                      onClick={() => toggleGroup(column)}
-                      role="button"
-                      tabIndex={0}
-                      aria-expanded={isExpanded}
-                      aria-controls={`group-${column}`}
-                      aria-label={`${column} 分类${isExpanded ? "，已展开" : "，已折叠"}`}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" || e.key === " ") {
-                          e.preventDefault()
-                          toggleGroup(column)
-                        }
-                      }}
-                    >
-                      <span>{column}</span>
-                      <span
-                        cmdk-group-toggle-indicator=""
-                        data-expanded={isExpanded}
-                        className="i-ph:caret-right w-4 h-4"
-                      />
-                    </div>
-                    {isExpanded && groupSources.map(item => (
-                      <SourceItem item={item} key={item.id} />
-                    ))}
-                    {!isExpanded && groupIsSearchResult && (
-                      <Command.Item
-                        key={`${column}-ghost`}
-                        value={`${column}-ghost-placeholder`}
-                        className="!hidden"
-                        keywords={allGroupKeywords}
-                        disabled
-                        onSelect={() => toggleGroup(column)}
-                      >
-                        {column}
-                      </Command.Item>
-                    )}
-                  </Command.Group>
-                )
-              })
+              sourceItems.map(groupData => (
+                <ColumnGroupDisplay
+                  key={groupData.column}
+                  column={groupData.column}
+                  groupSources={groupData.sources}
+                  allGroupKeywords={groupData.allGroupKeywords}
+                  isExpanded={expandedGroups[groupData.column] ?? false}
+                  trimmedQuery={debouncedQuery}
+                  toggleGroup={toggleGroup}
+                />
+              ))
             }
           </Command.List>
         </OverlayScrollbar>
@@ -246,10 +295,14 @@ export function SearchBar() {
   )
 }
 
-function SourceItem({ item }: {
+function SourceItem({ item, query }: {
   item: SourceItemProps
+  query: string
 }) {
   const { isFocused, toggleFocus } = useFocusWith(item.id)
+  const nameSegments = useTextHighlight(item.name, query)
+  const titleSegments = useTextHighlight(item.title, query)
+
   return (
     <Command.Item
       keywords={[item.name, item.title ?? "", item.pinyin, item.column].filter(Boolean) as string[]}
@@ -264,8 +317,26 @@ function SourceItem({ item }: {
             backgroundImage: `url(/icons/${item.id.split("-")[0]}.png)`,
           }}
         />
-        <span>{item.name}</span>
-        <span className="text-xs text-neutral-400/80 self-end mb-3px">{item.title}</span>
+        <span>
+          {nameSegments.map((segment, i) => (
+            <span
+              key={`name-seg-${item.id}-${i}-${segment.text.slice(0, 5)}`}
+              className={segment.isMatch ? "bg-yellow-300 dark:bg-yellow-500 text-black rounded-sm px-0.5 transition-colors duration-200" : ""}
+            >
+              {segment.text}
+            </span>
+          ))}
+        </span>
+        <span className="text-xs text-neutral-400/80 self-end mb-3px">
+          {item.title && titleSegments.map((segment, i) => (
+            <span
+              key={`title-seg-${item.id}-${i}-${segment.text.slice(0, 5)}`}
+              className={segment.isMatch ? "bg-yellow-300 dark:bg-yellow-500 text-black rounded-sm px-0.5 transition-colors duration-200" : ""}
+            >
+              {segment.text}
+            </span>
+          ))}
+        </span>
       </span>
       <span
         className={$(
