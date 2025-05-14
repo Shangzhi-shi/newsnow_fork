@@ -3,6 +3,7 @@ import { useMount } from "react-use"
 import type { SourceID } from "@shared/types"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import pinyin from "@shared/pinyin.json"
+import categoryPinyinData from "@shared/category-pinyin.json"
 import { sources } from "@shared/sources"
 import { columns } from "@shared/metadata"
 import { typeSafeObjectEntries } from "@shared/type.util"
@@ -19,7 +20,9 @@ interface SourceItemProps {
   name: string
   title?: string
   column: any
+  columnId?: string
   pinyin: string
+  keywords: string[]
 }
 
 interface ProcessedGroupData {
@@ -70,14 +73,8 @@ function ColumnGroupDisplay({
   let groupIsSearchResult = false
   if (trimmedQuery) {
     const lowerSearch = trimmedQuery.toLowerCase()
-    groupIsSearchResult
-      = column.toLowerCase().includes(lowerSearch)
-        || groupSources.some(
-          item =>
-            item.name.toLowerCase().includes(lowerSearch)
-            || (item.title && item.title.toLowerCase().includes(lowerSearch))
-            || (item.pinyin && item.pinyin.toLowerCase().includes(lowerSearch)),
-        )
+    // 简化后的判断逻辑：allGroupKeywords 已经包含了所有小写关键词（分类名、分类拼音、新闻源名称/标题/拼音）
+    groupIsSearchResult = allGroupKeywords.some(keyword => keyword.includes(lowerSearch))
   }
 
   return (
@@ -138,33 +135,51 @@ export function SearchBar() {
     const rawMappedItems = typeSafeObjectEntries(sources)
       .filter(([_, source]) => !source.redirect)
       .map(([k, source]) => {
-        const columnId = source.column as keyof typeof columns | undefined
+        const originalColumnId = source.column as keyof typeof columns | undefined
         let columnName = "未分类"
-        if (columnId && columns[columnId]) {
-          columnName = columns[columnId].zh
+        let resolvedColumnId: string | undefined
+
+        if (originalColumnId && columns[originalColumnId]) {
+          columnName = columns[originalColumnId].zh
+          resolvedColumnId = originalColumnId
         }
+
+        const columnPinyin = (resolvedColumnId && categoryPinyinData[resolvedColumnId as keyof typeof categoryPinyinData])
+          ? categoryPinyinData[resolvedColumnId as keyof typeof categoryPinyinData]
+          : ""
+
+        const sourcePinyin = pinyin?.[k as keyof typeof pinyin] ?? ""
+        const keywords = [
+          columnName.toLowerCase(),
+          columnPinyin.toLowerCase(),
+          source.name.toLowerCase(),
+          source.title ? source.title.toLowerCase() : "",
+          sourcePinyin.toLowerCase(),
+        ].filter(Boolean) as string[]
+
         return {
           id: k,
           title: source.title,
           column: columnName,
+          columnId: resolvedColumnId,
           name: source.name,
-          pinyin: pinyin?.[k as keyof typeof pinyin] ?? "",
+          pinyin: sourcePinyin,
+          keywords,
         }
       })
 
     const groupedByColumnData = groupByColumn(rawMappedItems)
 
-    return groupedByColumnData.map(group => ({
-      ...group,
-      allGroupKeywords: [
-        group.column,
-        ...group.sources.flatMap(item => [
-          item.name,
-          item.title ?? "",
-          item.pinyin,
-        ]).filter(Boolean),
-      ] as string[],
-    }))
+    return groupedByColumnData.map((group) => {
+      const allGroupKeywords = [
+        ...new Set(group.sources.flatMap(item => item.keywords)),
+      ].filter(Boolean)
+
+      return {
+        ...group,
+        allGroupKeywords,
+      }
+    })
   }, [])
 
   const inputRef = useRef<HTMLInputElement | null>(null)
@@ -305,7 +320,7 @@ function SourceItem({ item, query }: {
 
   return (
     <Command.Item
-      keywords={[item.name, item.title ?? "", item.pinyin, item.column].filter(Boolean) as string[]}
+      keywords={item.keywords}
       value={item.id}
       className="flex justify-between items-center p-2"
       onSelect={toggleFocus}
@@ -320,7 +335,7 @@ function SourceItem({ item, query }: {
         <span>
           {nameSegments.map((segment, i) => (
             <span
-              key={`name-seg-${item.id}-${i}-${segment.text.slice(0, 5)}`}
+              key={`name-seg-${item.id}-${i}`}
               className={segment.isMatch ? "bg-yellow-300 dark:bg-yellow-500 text-black rounded-sm px-0.5 transition-colors duration-200" : ""}
             >
               {segment.text}
@@ -330,7 +345,7 @@ function SourceItem({ item, query }: {
         <span className="text-xs text-neutral-400/80 self-end mb-3px">
           {item.title && titleSegments.map((segment, i) => (
             <span
-              key={`title-seg-${item.id}-${i}-${segment.text.slice(0, 5)}`}
+              key={`title-seg-${item.id}-${i}`}
               className={segment.isMatch ? "bg-yellow-300 dark:bg-yellow-500 text-black rounded-sm px-0.5 transition-colors duration-200" : ""}
             >
               {segment.text}
