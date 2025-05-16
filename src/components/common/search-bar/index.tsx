@@ -1,259 +1,126 @@
 import { Command } from "cmdk"
-import { useMount } from "react-use"
-import type { SourceID } from "@shared/types"
+import type { ColumnID, SourceID } from "@shared/types"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import pinyin from "@shared/pinyin.json"
-import categoryPinyinData from "@shared/category-pinyin.json"
-import { sources } from "@shared/sources"
-import { columns } from "@shared/metadata"
-import { typeSafeObjectEntries } from "@shared/type.util"
+import { useAtom } from "jotai"
 import { OverlayScrollbar } from "../overlay-scrollbar"
+import { ColumnGroupDisplay } from "./ColumnGroupDisplay.tsx"
 import { CardWrapper } from "~/components/column/card"
 import { useSearchBar } from "~/hooks/useSearch"
-import { useFocusWith } from "~/hooks/useFocus"
-import { useTextHighlight } from "~/hooks/useTextHighlight"
+import { primitiveMetadataAtom } from "~/atoms/primitiveMetadataAtom"
 
 import "./cmdk.css"
 
-interface SourceItemProps {
-  id: SourceID
-  name: string
-  title?: string
-  column: any
-  columnId?: string
-  pinyin: string
-  keywords: string[]
-}
-
-interface ProcessedGroupData {
-  column: string
-  sources: SourceItemProps[]
-  allGroupKeywords: string[]
-}
-
-function groupByColumn(items: SourceItemProps[]) {
-  return items.reduce((acc, item) => {
-    const k = acc.find(i => i.column === item.column)
-    if (k) k.sources = [...k.sources, item]
-    else acc.push({ column: item.column, sources: [item] })
-    return acc
-  }, [] as {
-    column: string
-    sources: SourceItemProps[]
-  }[]).sort((m, n) => {
-    if (m.column === "科技") return -1
-    if (n.column === "科技") return 1
-    if (m.column === "未分类") return 1
-    if (n.column === "未分类") return -1
-    return m.column < n.column ? -1 : 1
-  })
-}
+import { useProcessedSourceItems } from "~/hooks/useProcessedSourceItems.ts"
+import { useGroupExpansion } from "~/hooks/useGroupExpansion.ts"
+import { useSearchInput } from "~/hooks/useSearchInput.ts"
 
 const LOCAL_STORAGE_EXPANDED_GROUPS_KEY = "searchBarExpandedGroups"
 
-interface ColumnGroupDisplayProps {
-  column: string
-  groupSources: SourceItemProps[]
-  allGroupKeywords: string[]
-  isExpanded: boolean
-  trimmedQuery: string
-  toggleGroup: (columnName: string) => void
-}
-
-function ColumnGroupDisplay({
-  column,
-  groupSources,
-  allGroupKeywords,
-  isExpanded,
-  trimmedQuery,
-  toggleGroup,
-}: ColumnGroupDisplayProps) {
-  const columnSegments = useTextHighlight(column, trimmedQuery)
-
-  let groupIsSearchResult = false
-  if (trimmedQuery) {
-    const lowerSearch = trimmedQuery.toLowerCase()
-    // 简化后的判断逻辑：allGroupKeywords 已经包含了所有小写关键词（分类名、分类拼音、新闻源名称/标题/拼音）
-    groupIsSearchResult = allGroupKeywords.some(keyword => keyword.includes(lowerSearch))
-  }
-
-  return (
-    <Command.Group key={column}>
-      <div
-        className="flex items-center justify-between cursor-pointer p-2 cmdk-group-heading"
-        onClick={() => toggleGroup(column)}
-        role="button"
-        tabIndex={0}
-        aria-expanded={isExpanded}
-        aria-controls={`group-${column}`}
-        aria-label={`${column} 分类${isExpanded ? "，已展开" : "，已折叠"}`}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" || e.key === " ") {
-            e.preventDefault()
-            toggleGroup(column)
-          }
-        }}
-      >
-        <span>
-          {columnSegments.map((segment, i) => (
-            <span
-              key={`col-seg-${column}-${i}-${segment.text.slice(0, 5)}`}
-              className={segment.isMatch ? "bg-yellow-300 dark:bg-yellow-500 text-black rounded-sm px-0.5 transition-colors duration-200" : ""}
-            >
-              {segment.text}
-            </span>
-          ))}
-        </span>
-        <span
-          cmdk-group-toggle-indicator=""
-          data-expanded={isExpanded}
-          className="i-ph:caret-right w-4 h-4"
-        />
-      </div>
-      {isExpanded && groupSources.map(item => (
-        <SourceItem item={item} key={item.id} query={trimmedQuery} />
-      ))}
-      {!isExpanded && groupIsSearchResult && (
-        <Command.Item
-          key={`${column}-ghost`}
-          value={`${column}-ghost-placeholder`}
-          className="!hidden"
-          keywords={allGroupKeywords}
-          disabled
-          onSelect={() => toggleGroup(column)}
-        >
-          {column}
-        </Command.Item>
-      )}
-    </Command.Group>
-  )
-}
-
+/**
+ * 搜索栏组件。
+ * 提供一个命令面板式的界面 (cmdk)，用于搜索新闻源和分类。
+ * 功能包括：
+ * - 显示新闻源，按分类组织，支持置顶。
+ * - 实时搜索过滤新闻源和分类。
+ * - 管理分类的展开/折叠状态，并持久化到 localStorage。
+ * - 允许用户通过点击或键盘快捷键 (Cmd/Ctrl + K) 打开/关闭。
+ * - 在右侧（桌面视图）显示当前选中新闻源的预览卡片。
+ */
 export function SearchBar() {
   const { opened, toggle } = useSearchBar()
-  const sourceItems = useMemo((): ProcessedGroupData[] => {
-    const rawMappedItems = typeSafeObjectEntries(sources)
-      .filter(([_, source]) => !source.redirect)
-      .map(([k, source]) => {
-        const originalColumnId = source.column as keyof typeof columns | undefined
-        let columnName = "未分类"
-        let resolvedColumnId: string | undefined
+  const [primitiveMetadata, setPrimitiveMetadata] = useAtom(primitiveMetadataAtom)
+  const pinnedColumns = primitiveMetadata.pinnedColumns ?? []
 
-        if (originalColumnId && columns[originalColumnId]) {
-          columnName = columns[originalColumnId].zh
-          resolvedColumnId = originalColumnId
-        }
-
-        const columnPinyin = (resolvedColumnId && categoryPinyinData[resolvedColumnId as keyof typeof categoryPinyinData])
-          ? categoryPinyinData[resolvedColumnId as keyof typeof categoryPinyinData]
-          : ""
-
-        const sourcePinyin = pinyin?.[k as keyof typeof pinyin] ?? ""
-        const keywords = [
-          columnName.toLowerCase(),
-          columnPinyin.toLowerCase(),
-          source.name.toLowerCase(),
-          source.title ? source.title.toLowerCase() : "",
-          sourcePinyin.toLowerCase(),
-        ].filter(Boolean) as string[]
-
-        return {
-          id: k,
-          title: source.title,
-          column: columnName,
-          columnId: resolvedColumnId,
-          name: source.name,
-          pinyin: sourcePinyin,
-          keywords,
-        }
-      })
-
-    const groupedByColumnData = groupByColumn(rawMappedItems)
-
-    return groupedByColumnData.map((group) => {
-      const allGroupKeywords = [
-        ...new Set(group.sources.flatMap(item => item.keywords)),
-      ].filter(Boolean)
-
+  // 处理分类置顶/取消置顶的回调函数
+  const handleTogglePin = useCallback((columnIdToToggle: ColumnID) => {
+    setPrimitiveMetadata((currentMetadata) => {
+      const currentPinned = currentMetadata.pinnedColumns ?? []
+      let newPinnedColumns
+      if (currentPinned.includes(columnIdToToggle)) {
+        newPinnedColumns = currentPinned.filter(id => id !== columnIdToToggle)
+      } else {
+        newPinnedColumns = [columnIdToToggle, ...currentPinned]
+      }
       return {
-        ...group,
-        allGroupKeywords,
+        ...currentMetadata,
+        pinnedColumns: newPinnedColumns,
+        updatedTime: Date.now(),
+        action: "manual",
       }
     })
-  }, [])
+  }, [setPrimitiveMetadata])
 
+  // 获取处理后的新闻源项目，按分类分组并考虑置顶状态
+  const sourceItems = useProcessedSourceItems(pinnedColumns)
+
+  // 搜索输入框引用
   const inputRef = useRef<HTMLInputElement | null>(null)
 
+  // 当前选中的新闻源ID
   const [value, setValue] = useState<SourceID>("github-trending-today")
-  const [currentInputValue, setCurrentInputValue] = useState("")
-  const [debouncedQuery, setDebouncedQuery] = useState("")
 
+  // 搜索输入与防抖处理
+  const {
+    inputValue: currentInputValue,
+    setInputValue: setCurrentInputValue,
+    debouncedValue: debouncedQuery,
+    resetInput,
+  } = useSearchInput()
+
+  // 为了类型兼容性，创建一个仅包含column属性的数组
+  const sourceItemsForExpansion = useMemo(() =>
+    sourceItems.map(item => ({ column: item.column })), [sourceItems])
+
+  // 管理分组的展开/折叠状态
+  const { expandedGroups, toggleGroup, toggleAllGroups } = useGroupExpansion(
+    LOCAL_STORAGE_EXPANDED_GROUPS_KEY,
+    sourceItemsForExpansion,
+  )
+
+  // 缓存所有源ID列表，避免在onValueChange中重复计算
+  const allSourceIds = useMemo(() =>
+    sourceItems.flatMap(group => group.sources.map(s => s.id)), [sourceItems])
+
+  // 处理源选择变更
+  const handleValueChange = useCallback((v: string) => {
+    if (allSourceIds.includes(v as SourceID)) {
+      setValue(v as SourceID)
+    }
+  }, [allSourceIds])
+
+  // 当对话框关闭时重置搜索输入
   useEffect(() => {
-    const handler = setTimeout(() => {
-      setDebouncedQuery(currentInputValue.trim())
-    }, 300)
-
-    return () => {
-      clearTimeout(handler)
+    if (!opened) {
+      resetInput()
     }
-  }, [currentInputValue])
+  }, [opened, resetInput])
 
-  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>(() => {
-    try {
-      const saved = localStorage.getItem(LOCAL_STORAGE_EXPANDED_GROUPS_KEY)
-      return saved ? JSON.parse(saved) : {}
-    } catch {
-      return {}
+  // 处理键盘快捷键
+  const handleKeyDown = useCallback((e: KeyboardEvent) => {
+    if (e.key === "k" && (e.metaKey || e.ctrlKey)) {
+      e.preventDefault()
+      toggle()
     }
-  })
+  }, [toggle])
 
+  // 挂载时自动聚焦搜索框，并设置键盘快捷键
   useEffect(() => {
-    try {
-      localStorage.setItem(LOCAL_STORAGE_EXPANDED_GROUPS_KEY, JSON.stringify(expandedGroups))
-    } catch (error) {
-      console.error("Failed to save expandedGroups to localStorage", error)
+    if (opened && inputRef?.current) {
+      inputRef.current.focus()
     }
-  }, [expandedGroups])
 
-  const toggleGroup = useCallback((groupName: string) => {
-    setExpandedGroups(prev => ({
-      ...prev,
-      [groupName]: !(prev[groupName] ?? false),
-    }))
-  }, [])
-
-  const toggleAllGroups = useCallback((expand: boolean) => {
-    const allGroups = sourceItems.reduce((acc, { column }) => {
-      acc[column] = expand
-      return acc
-    }, {} as Record<string, boolean>)
-    setExpandedGroups(allGroups)
-  }, [sourceItems])
-
-  useMount(() => {
-    inputRef?.current?.focus()
-    const keydown = (e: KeyboardEvent) => {
-      if (e.key === "k" && (e.metaKey || e.ctrlKey)) {
-        e.preventDefault()
-        toggle()
-      }
-    }
-    document.addEventListener("keydown", keydown)
+    document.addEventListener("keydown", handleKeyDown)
     return () => {
-      document.removeEventListener("keydown", keydown)
+      document.removeEventListener("keydown", handleKeyDown)
     }
-  })
+  }, [opened, handleKeyDown])
 
   return (
     <Command.Dialog
       open={opened}
       onOpenChange={toggle}
       value={value}
-      onValueChange={(v) => {
-        if (v in sources) {
-          setValue(v as SourceID)
-        }
-      }}
+      onValueChange={handleValueChange}
     >
       <Command.Input
         ref={inputRef}
@@ -292,11 +159,14 @@ export function SearchBar() {
                 <ColumnGroupDisplay
                   key={groupData.column}
                   column={groupData.column}
+                  columnId={groupData.columnId}
                   groupSources={groupData.sources}
                   allGroupKeywords={groupData.allGroupKeywords}
                   isExpanded={expandedGroups[groupData.column] ?? false}
                   trimmedQuery={debouncedQuery}
                   toggleGroup={toggleGroup}
+                  isPinned={groupData.columnId ? pinnedColumns.includes(groupData.columnId) : false}
+                  onTogglePin={handleTogglePin}
                 />
               ))
             }
@@ -307,59 +177,5 @@ export function SearchBar() {
         </div>
       </div>
     </Command.Dialog>
-  )
-}
-
-function SourceItem({ item, query }: {
-  item: SourceItemProps
-  query: string
-}) {
-  const { isFocused, toggleFocus } = useFocusWith(item.id)
-  const nameSegments = useTextHighlight(item.name, query)
-  const titleSegments = useTextHighlight(item.title, query)
-
-  return (
-    <Command.Item
-      keywords={item.keywords}
-      value={item.id}
-      className="flex justify-between items-center p-2"
-      onSelect={toggleFocus}
-    >
-      <span className="flex gap-2 items-center">
-        <span
-          className={$("w-4 h-4 rounded-md bg-cover")}
-          style={{
-            backgroundImage: `url(/icons/${item.id.split("-")[0]}.png)`,
-          }}
-        />
-        <span>
-          {nameSegments.map((segment, i) => (
-            <span
-              key={`name-seg-${item.id}-${i}`}
-              className={segment.isMatch ? "bg-yellow-300 dark:bg-yellow-500 text-black rounded-sm px-0.5 transition-colors duration-200" : ""}
-            >
-              {segment.text}
-            </span>
-          ))}
-        </span>
-        <span className="text-xs text-neutral-400/80 self-end mb-3px">
-          {item.title && titleSegments.map((segment, i) => (
-            <span
-              key={`title-seg-${item.id}-${i}`}
-              className={segment.isMatch ? "bg-yellow-300 dark:bg-yellow-500 text-black rounded-sm px-0.5 transition-colors duration-200" : ""}
-            >
-              {segment.text}
-            </span>
-          ))}
-        </span>
-      </span>
-      <span
-        className={$(
-          isFocused
-            ? "i-ph:star-fill text-red-600 dark:text-yellow-400 opacity-100"
-            : "i-ph:star-duotone bg-primary op-40",
-        )}
-      />
-    </Command.Item>
   )
 }

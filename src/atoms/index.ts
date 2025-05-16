@@ -4,17 +4,31 @@ import { atom } from "jotai"
 import type { Update } from "./types"
 import { primitiveMetadataAtom } from "./primitiveMetadataAtom"
 
+function isSourceInCategory(sourceId: SourceID, categoryId: FixedColumnID): boolean {
+  const source = sources[sourceId]
+  if (!source) return false
+
+  return (
+    (categoryId === "hottest" && source.type === "hottest")
+    || (categoryId === "realtime" && source.type === "realtime")
+    || source.column === categoryId
+  )
+}
+
 export const focusSourcesAtom = atom((get) => {
   return get(primitiveMetadataAtom).data.focus
 }, (get, set, update: Update<SourceID[]>) => {
   const _ = update instanceof Function ? update(get(focusSourcesAtom)) : update
+  const currentMetadata = get(primitiveMetadataAtom)
   set(primitiveMetadataAtom, {
+    ...currentMetadata,
     updatedTime: Date.now(),
     action: "manual",
     data: {
-      ...get(primitiveMetadataAtom).data,
+      ...currentMetadata.data,
       focus: _,
     },
+    // pinnedColumns 将通过 ...currentMetadata 保留下来
   })
 })
 
@@ -27,20 +41,6 @@ export const currentSourcesAtom = atom((get) => {
   // 如果是关注列表，直接返回收藏的源
   if (id === "focus") {
     return metadataData[id] || []
-  }
-
-  /**
-   * 判断信息源是否属于指定分类
-   */
-  const isSourceInCategory = (sourceId: SourceID, categoryId: FixedColumnID): boolean => {
-    const source = sources[sourceId]
-    if (!source) return false
-
-    return (
-      (categoryId === "hottest" && source.type === "hottest")
-      || (categoryId === "realtime" && source.type === "realtime")
-      || source.column === categoryId
-    )
   }
 
   const focusSources = get(focusSourcesAtom)
@@ -66,7 +66,7 @@ export const currentSourcesAtom = atom((get) => {
   // 处理那些已收藏、属于当前分类，但可能还未出现在 savedOrderForCurrentCategory 中的源 (例如新收藏的)
   // 这些新收藏的源应该被添加到 orderedFocusedSources 的末尾 (或头部，或根据 focusSources 顺序插入)
   // 为了简单起见，并保持与 focusSourcesAtom 顺序的一致性，我们将它们按 focusSourcesAtom 的顺序加入
-  const currentSavedFocusedSet = new Set(orderedFocusedSources) // 已在 savedOrder 中找到的收藏源
+  const currentSavedFocusedSet = new Set(orderedFocusedSources)
   const newFocusedSourcesInThisCategory = focusSources.filter(
     focusedSourceId =>
       isSourceInCategory(focusedSourceId, id)
@@ -77,13 +77,18 @@ export const currentSourcesAtom = atom((get) => {
   return [...orderedFocusedSources, ...newFocusedSourcesInThisCategory, ...orderedRestSources]
 }, (get, set, update: Update<SourceID[]>) => {
   const _ = update instanceof Function ? update(get(currentSourcesAtom)) : update
+  const currentMetadata = get(primitiveMetadataAtom)
+  const currentColumnId = get(currentColumnIDAtom)
+
   set(primitiveMetadataAtom, {
+    ...currentMetadata,
     updatedTime: Date.now(),
     action: "manual",
     data: {
-      ...get(primitiveMetadataAtom).data,
-      [get(currentColumnIDAtom)]: _,
+      ...currentMetadata.data,
+      [currentColumnId]: _,
     },
+    // pinnedColumns 将通过 ...currentMetadata 保留下来
   })
 })
 
