@@ -4,6 +4,9 @@ import { Outlet, createRootRouteWithContext } from "@tanstack/react-router"
 import { TanStackRouterDevtools } from "@tanstack/router-devtools"
 import { ReactQueryDevtools } from "@tanstack/react-query-devtools"
 import type { QueryClient } from "@tanstack/react-query"
+import { useEffect } from "react"
+import { createRoot } from "react-dom/client"
+import { StagewiseToolbar } from "@stagewise/toolbar-react"
 import { Header } from "~/components/header"
 import { GlobalOverlayScrollbar } from "~/components/common/overlay-scrollbar"
 import { Footer } from "~/components/footer"
@@ -28,6 +31,20 @@ function RootComponent() {
   useOnReload()
   useSync()
   usePWA()
+
+  useEffect(() => {
+    if (import.meta.env.DEV) {
+      const stagewiseRootElement = document.getElementById("stagewise-toolbar-root")
+      if (stagewiseRootElement) {
+        const stagewiseConfig = {
+          plugins: [],
+        }
+        const root = createRoot(stagewiseRootElement)
+        root.render(<StagewiseToolbar config={stagewiseConfig} />)
+      }
+    }
+  }, [])
+
   return (
     <>
       <GlobalOverlayScrollbar className={$([
@@ -67,6 +84,7 @@ function RootComponent() {
         <>
           <ReactQueryDevtools buttonPosition="bottom-left" />
           <TanStackRouterDevtools position="bottom-right" />
+          <div id="stagewise-toolbar-root"></div>
         </>
       )}
     </>
