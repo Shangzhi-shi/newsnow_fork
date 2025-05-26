@@ -74,6 +74,22 @@ export interface PrimitiveMetadata {
   action: "init" | "manual" | "sync"
 }
 
+/**
+ * 用户自定义聚合视图配置接口
+ */
+export interface AggregatedViewConfig {
+  /** 聚合视图唯一标识 */
+  id: string
+  /** 聚合视图名称 */
+  name: string
+  /** 包含的新闻源ID数组 */
+  sources: SourceID[]
+  /** 创建时间戳 */
+  createdAt: number
+  /** 最后更新时间戳 */
+  updatedAt: number
+}
+
 // 固定栏目 ID 类型（在顶部导航栏中固定显示的栏目）
 export type FixedColumnID = (typeof fixedColumnIds)[number]
 // 隐藏栏目 ID 类型（不在固定栏目中的其他栏目）

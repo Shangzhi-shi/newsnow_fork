@@ -240,7 +240,7 @@ function NewsUpdatedTime({ date }: { date: string | number }) {
   const relativeTime = useRelativeTime(date)
   return <>{relativeTime}</>
 }
-function NewsListHot({ items }: { items: NewsItem[] }) {
+export function NewsListHot({ items }: { items: NewsItem[] }) {
   const { width } = useWindowSize()
   return (
     <ol className="flex flex-col gap-2">
@@ -273,7 +273,7 @@ function NewsListHot({ items }: { items: NewsItem[] }) {
   )
 }
 
-function NewsListTimeLine({ items }: { items: NewsItem[] }) {
+export function NewsListTimeLine({ items }: { items: NewsItem[] }) {
   const { width } = useWindowSize()
   return (
     <ol className="border-s border-neutral-400/50 flex flex-col ml-1">
@@ -299,6 +299,12 @@ function NewsListTimeLine({ items }: { items: NewsItem[] }) {
             rel="noopener noreferrer"
           >
             {item.title}
+            {(item as any).originalSourceName && (
+              <div className="text-xs text-neutral-400/80 mt-0.5">
+                来源：
+                {(item as any).originalSourceName}
+              </div>
+            )}
           </a>
         </li>
       ))}

@@ -1,24 +1,169 @@
-# NewsNow 二次开发计划
+# 任务列表
 
-## 项目信息
-- **项目名称**: NewsNow (fork 定制开发版)
-- **原项目**: https://github.com/ourongxing/newsnow
-- **开发分支**: dev
-- **开发语言**: TypeScript, React
-- **更新日期**: 2023-07-25
+## 实现新闻分类置顶功能
+- [ ] 实现新闻分类置顶功能
+  - [x] **阶段一：前端实现 ("更多"弹窗内列表置顶，本地持久化与核心状态集成)**
+    - [x] 调研并确定分类显示组件 (`src/components/navbar.tsx`) 和数据源 (`shared/metadata.ts`) - 已完成
+    - [x] 修改 `shared/types.ts`：在 `PrimitiveMetadata` 接口中增加 `pinnedColumns?: ColumnID[]` 字段。 - 已完成
+    - [x] 修改 `shared/verify.ts`：更新 `verifyPrimitiveMetadata` 函数以校验新的 `pinnedColumns` 字段。 - 已完成
+    - [x] 修改 `src/atoms/primitiveMetadataAtom.ts`：
+      - [x] 扩展 `primitiveMetadataAtom` 的状态结构以包含 `pinnedColumns`。 - 已完成
+      - [x] 调整其初始化逻辑 (`initialValue`, `getInitialValue`) 以处理 `pinnedColumns` (包括旧数据兼容)。 - 已完成
+      - [x] 确保 `preprocessMetadata` 函数能正确处理（传递或初始化）`pinnedColumns`。 - 已完成
+    - [x] 在"更多"弹窗内的分类列表组件中（疑似 `src/components/common/search-bar/index.tsx` 或其子组件）：
+      - [x] 从 `primitiveMetadataAtom` 读取 `pinnedColumns` 状态。 - 已完成
+      - [x] 计算该列表的最终分类显示顺序（置顶的在前，非置顶的在后，保持原有相对顺序）。 - 已完成
+      - [x] 为该列表中的每个分类项添加"置顶/取消置顶"按钮（如图钉图标）。 - 已完成
+      - [x] 实现点击按钮更新 `primitiveMetadataAtom` 中的 `pinnedColumns`、`updatedTime` 和 `action: "manual"` 的逻辑。 - 已完成
+      - [x] 修复置顶图标不显示的问题。 - 已完成 (2024-07-26)
+      - [x] 修复置顶按钮样式问题（图标对齐和大小调整）。 - 已完成 (2024-07-26)
+      - [x] 为置顶分类项和置顶按钮提供视觉反馈（按钮图标/透明度变化，分类项排序变化）。 - 已完成 (2024-07-26)
+      - [x] 测试纯前端的置顶、取消置顶功能（仅影响"更多"弹窗内列表），确保状态正确更新并通过 `localStorage` 持久化（通过 `primitiveMetadataAtom`）。 - 已完成 (2024-07-26)
+  - [ ] **阶段二：后端同步 (利用现有机制)**
+    - [ ] 确认 `PrimitiveMetadata` 结构变更后，现有的后端同步机制 (`src/hooks/useSync.ts`, `server/api/me/sync.ts`, `server/database/user.ts`) 能够正确处理包含 `pinnedColumns` 的数据。
+      - [ ] `server/api/me/sync.ts`: 确保能接收、传递给数据库服务，并从数据库服务返回包含 `pinnedColumns` 的数据。
+      - [ ] `server/database/user.ts`: 确保 `UserTable` 的 `setData` 和 `getData` 方法能正确处理存储和检索包含 `pinnedColumns` 的JSON对象。
+      - [ ] `src/hooks/useSync.ts`: 确保在上传和下载元数据时，`pinnedColumns` 作为 `PrimitiveMetadata` 的一部分被正确处理。
+    - [ ] 测试登录、登出情况下的置顶状态同步和跨设备一致性。
+  - [ ] **阶段三：代码审查与优化 (针对"更多"弹窗功能)**
+    - [ ] 对所有修改进行代码审查 (针对"更多"弹窗功能)。
+    - [x] **重构 `src/components/common/search-bar/index.tsx` 以提升可维护性和可读性**- 已完成 (2024-07-27)
+      - [x] **重构阶段 A：提取子组件** - 已完成 (2024-07-26)
+        - [x] 将 `ColumnGroupDisplay` 组件及其相关类型/逻辑提取到新文件 `src/components/common/search-bar/ColumnGroupDisplay.tsx`。 - 已完成 (2024-07-26)
+        - [x] 将 `SourceItem` 组件及其相关类型/逻辑提取到新文件 `src/components/common/search-bar/SourceItem.tsx`。 - 已完成 (2024-07-26)
+        - [x] 更新 `index.tsx` 以导入并使用提取后的组件。 - 已完成 (2024-07-26)
+      - [x] **重构阶段 B：提取自定义 Hooks** - 已完成 (2024-07-27)
+        - [x] 考虑将 `sourceItems` 的计算和排序逻辑提取到自定义 Hook `useProcessedSourceItems`。 - 已完成 (2024-07-26)
+        - [x] 考虑将分组展开/折叠状态 (`expandedGroups`) 及其 localStorage 逻辑提取到自定义 Hook `useGroupExpansion`。 - 已完成 (2024-07-27)
+        - [x] 考虑将搜索输入和防抖逻辑提取到自定义 Hook `useSearchInput`。 - 已完成 (2024-07-26)
+    - [x] **代码文档与注释优化** - 已完成 (2024-07-27)
+      - [x] 将代码中的英文注释替换为中文注释，确保项目文档一致性。 - 已完成 (2024-07-27)
+      - [x] 为核心类型、接口和函数添加详细的 JSDoc 风格注释。 - 已完成 (2024-07-27)
+      - [x] 确保 Hook、组件和工具函数有清晰的中文注释说明其目的和用法。 - 已完成 (2024-07-27)
+    - [ ] 考虑多个置顶分类的排序逻辑是否需要用户自定义（初期可固定排序规则，例如按其在 `fixedColumnIds` 中的原始顺序或用户置顶的顺序）。
+  - [ ] **阶段四：扩展置顶功能至主导航栏 (低优先级)**
+    - [ ] 在 `src/components/navbar.tsx` (主导航栏组件) 中应用 `pinnedColumns` 状态。
+    - [ ] 修改主导航栏的分类渲染逻辑，使其也根据用户设置的 `pinnedColumns` 和 `fixedColumnIds` 进行排序（置顶的在前，非置顶的在后，保持原有相对顺序）。
+    - [ ] 测试主导航栏的排序是否与"更多"弹窗中的置顶设置一致。
+    - [ ] 对主导航栏排序功能的修改进行代码审查。
 
-## 开发目标
-该 fork 项目旨在基于原 NewsNow 项目进行定制化开发，添加新功能和优化现有功能，提升用户体验。
+## 实现用户自定义新闻源聚合与时间排序功能 (并支持多配置管理)
 
-## 任务列表
+- [x] **阶段一：后端核心功能**
+  - [x] **数据存储决策与实现 (server/database/user.ts, shared/types.ts)**
+    - [x] 采用独立数据存储项方案：在用户数据中为"聚合视图配置"设置独立的存储键 (例如: `aggregated_views_config`)。 - 已完成 (2024-07-28)
+    - [x] 在 `shared/types.ts` 中定义 `AggregatedViewConfig { id: string, name: string, sources: SourceID[], createdAt: number, updatedAt: number }` 接口。 - 已完成 (2024-07-28)
+    - [x] 调整 `server/database/user.ts` 中的用户数据处理逻辑，以支持读写 `AggregatedViewConfig[]`。 - 已完成 (2024-07-28)
+  - [x] **聚合配置CRUD API (server/api/me/aggregated-views/)** - 已完成 (2024-07-28)
+    - [x] 创建 `index.get.ts`: 获取用户的所有聚合配置。 - 已完成 (2024-07-28)
+    - [x] 创建 `index.post.ts`: 创建新的聚合配置 (接收名称、SourceID列表)。 - 已完成 (2024-07-28)
+    - [x] 创建 `[id].put.ts`: 更新指定ID的聚合配置 (可更新名称、SourceID列表)。 - 已完成 (2024-07-28)
+    - [x] 创建 `[id].delete.ts`: 删除指定ID的聚合配置。 - 已完成 (2024-07-28)
+    - [x] 在所有CRUD API中实现必要的输入验证 (Zod) 和用户身份验证。 - 已完成 (2024-07-28)
+  - [x] **新闻聚合API (server/api/s/aggregate.get.ts 或可复用并扩展现有 /s/entire.post.ts)** - 已完成 (2024-07-30)
+    - [x] API接收 `sourceIds: SourceID[]` 作为参数。 - 已完成 (2024-07-30)
+    - [x] 并行获取指定新闻源数据 (复用现有 `getters` 和缓存逻辑)。 - 已完成 (2024-07-30)
+    - [x] 为每个获取到的 `NewsItem` 注入其原始来源ID (`originalSourceId`) 和来源名称 (`originalSourceName`) 以便前端展示区分。 - 已完成 (2024-07-30)
+    - [x] 统一并规范化处理所有新闻条目的时间戳 (确保有 `timestamp` 字段用于排序)。 - 已完成 (2024-07-30)
+    - [x] 实现对合并后的新闻列表按 `timestamp` **降序**排序。 - 已完成 (2024-07-30)
+    - [x] **调整** API将返回固定数量（例如最新的30-50条，具体数量待定）的聚合新闻条目，不再实现分页。 - 已完成 (2024-07-30)
+    - [x] 定义清晰的API响应结构 (包含聚合新闻列表、可能的错误)。 - 已完成 (2024-07-30)
+    - [x] 实现聚合结果的缓存策略 (针对相同的 `sourceIds` 组合)，明确使用 Nitro 的 `defineCachedEventHandler`。 - 已完成 (2024-07-30)
+      - [x] 定义缓存的 `getKey` 策略，应基于 `sourceIds`。 - 已完成 (2024-07-30)
+      - [x] **优化** 实现源获取失败的优雅降级策略：当某些源不可用时，仍返回可用源的数据。 - 已完成 (2024-07-30)
+    - [x] **同步机制调整 (src/hooks/useSync.ts)** - 已完成 (2024-07-31)
+      - [x] 修改 `uploadMetadata` 和 `downloadMetadata` (或创建新的同步函数/逻辑分支) 以包含 `aggregated_views_config` 的同步。 - 已完成 (2024-07-31)
 
-## 注意事项
-1. 所有开发工作必须在 dev 分支上进行
-2. 针对复杂功能应当创建专门的特性分支
-3. 每完成一项任务后，及时更新本文档进度
-4. 定期与原仓库同步以获取最新更新
+- [x] **阶段二：前端状态与核心逻辑** - 已完成 (2024-08-01)
+  - [x] **状态管理 (src/atoms/index.ts)** - 已完成 (2024-08-01)
+    - [x] 创建 `aggregatedViewsAtom = atomWithStorage<AggregatedViewConfig[]>('aggregated-views-config', [])`。 - 已完成 (2024-08-01)
+    - [x] 创建 `activeAggregatedViewIdAtom = atom<string | null>(null)`，用于在"我的聚合"页面管理和展示当前激活的聚合配置。 - 已完成 (2024-08-01)
+    - [x] 创建派生原子 `currentSelectedSourcesForAggregationAtom = atom<SourceID[]>(get => ...)`。 - 已完成 (2024-08-01)
+    - [x] 创建派生原子 `activeAggregatedViewConfigAtom = atom<AggregatedViewConfig | null>(get => ...)`。 - 已完成 (2024-08-01)
+    - [x] **优化** 使用 `atom.onMount` 优化大型聚合配置列表的初始化。 - 已完成 (2024-08-01)
+    - [x] **优化** 为复杂对象添加 selector 优化：创建 `aggregatedViewsByIdAtom` 派生原子，将数组索引为 ID 映射以提高查找性能。 - 已完成 (2024-08-01)
+  - [x] **API调用与数据处理** - 已完成 (2024-08-01)
+    - [x] 实现调用后端新闻聚合API的逻辑 (使用 TanStack Query)。 - 已完成 (2024-08-01)
+    - [x] 处理加载状态、错误状态。 - 已完成 (2024-08-01)
+    - [x] **Query Key 设计**: 为 `useAggregatedFeedQuery` 设计明确的 Query Key 结构，包含聚合配置ID和源列表。 - 已完成 (2024-08-01)
+    - [x] **调整** 使用普通的 `useQuery` 来获取聚合新闻数据，不再使用 `useInfiniteQuery`。 - 已完成 (2024-08-01)
+    - [x] **依赖查询管理**: 确保聚合新闻的查询通过 `enabled` 选项，仅在存在有效聚合配置时执行。 - 已完成 (2024-08-01)
+    - [x] **优化** 配置智能的 `retry` 策略，使用指数退避算法。 - 已完成 (2024-08-01)
+  - [x] **优化** 实现聚合配置的 CRUD mutations: - 已完成 (2024-08-01)
+    - [x] 为聚合配置管理创建一组 `useMutation` hooks，包括创建、更新和删除操作。 - 已完成 (2024-08-01)
+    - [x] 为每个 mutation 添加乐观更新（Optimistic Updates）以提升用户体验。 - 已完成 (2024-08-01)
 
-## 参考资源
-- 原项目文档：https://github.com/ourongxing/newsnow#readme
-- 项目结构说明：见 CONTRIBUTING.md
-- 技术栈文档：React、Vite、Jotai、UnoCSS、TanStack Router、Nitro
+- [x] **阶段三：用户界面 (UI) 开发** - 已完成 (2024-08-05)
+  - [x] **在现有路由系统中集成'我的聚合'功能 (`src/routes/c.$column.tsx`)** - 已完成 (2024-08-05)
+    - [x] 利用现有路由参数机制处理 "my-aggregations" 特殊路径并提供相应组件渲染。 - 已完成 (2024-08-05)
+    - [x] 在导航栏中添加'我的聚合'入口按钮，位于'关注'右侧。 - 已完成 (2024-08-05)
+  - [x] **'我的聚合'功能组件实现 (`src/components/aggregation/MyAggregations.tsx`)** - 已完成 (2024-08-05)
+    - [x] **聚合配置管理区** (页面左侧): - 已完成 (2024-08-05)
+      - [x] UI组件列出所有已保存的聚合配置 (显示名称)。 - 已完成 (2024-08-05)
+      - [x] 提供"创建新聚合视图"的按钮/入口。 - 已完成 (2024-08-05)
+      - [x] 为每个已保存的配置提供操作："激活/查看"、"编辑名称/源"、"删除"(带确认)。 - 已完成 (2024-08-05)
+      - [x] 点击聚合配置时，设置 `activeAggregatedViewIdAtom`，并触发右侧新闻展示区的刷新。 - 已完成 (2024-08-05)
+      - [x] **API交互与状态管理**: 使用 TanStack Query 的 `useMutation` Hook 处理创建、更新、删除聚合配置的 API 调用。 - 已完成 (2024-08-05)
+        - [x] 实现配置的 CRUD 操作的乐观更新 (Optimistic Updates) 以提升用户体验。 - 已完成 (2024-08-05)
+    - [x] **聚合新闻展示区** (页面右侧): - 已完成 (2024-08-05)
+      - [x] 根据 `activeAggregatedViewConfigAtom` 从后端获取并展示聚合新闻。 - 已完成 (2024-08-05)
+      - [x] 区域头部显示当前激活的聚合配置名称及更新时间。 - 已完成 (2024-08-05)
+      - [x] **新闻列表渲染**: - 已完成 (2024-08-05)
+        - [x] 自定义 `AggregatedNewsList` 组件展示排序后的聚合新闻条目。 - 已完成 (2024-08-05)
+        - [x] 在每条新闻的**标题下方**显示其**原始来源名称** (显示"来源：XXX源")。 - 已完成 (2024-08-05)
+      - [x] **移除** ~~实现分页加载或无限滚动。~~ (由于功能调整为不分页) - 已完成 (2024-08-05)
+      - [x] 实现空状态、加载状态和错误状态的友好展示。 - 已完成 (2024-08-05)
+      - [x] **优化** 实现响应式布局，确保在各种屏幕尺寸下有良好的用户体验。 - 已完成 (2024-08-05)
+      - [x] **优化** 添加动画反馈，优化聚合配置切换、加载和错误状态的视觉过渡。 - 已完成 (2024-08-05)
+  - [x] **聚合配置创建/编辑表单/模态框 (`src/components/aggregation/ConfigForm.tsx`)** - 已完成 (2024-08-05)
+    - [x] 输入框供用户填写聚合视图的名称。 - 已完成 (2024-08-05)
+    - [x] 复用或改造现有的"源选择器UI"，允许用户勾选多个新闻源。 - 已完成 (2024-08-05)
+    - [x] "保存"或"更新"按钮，调用API并更新前端状态。 - 已完成 (2024-08-05)
+    - [x] **优化** 实现表单验证，确保用户输入有效的配置数据（如非空名称，至少选择一个源）。 - 已完成 (2024-08-05)
+
+- [ ] **阶段四：架构调整 - 改为"本地优先，可选同步"模式**
+  - [x] **前端聚合配置的 CRUD 操作调整**：
+    - [x] 重构 `src/components/aggregation/MyAggregations.tsx` 中的配置创建/修改/删除逻辑：
+      - [x] 直接操作 `aggregatedViewsAtom` 进行本地状态更新和持久化。 - 已完成 (2024-08-06)
+      - [x] UI 的变更立即根据本地状态的更新而更新。 - 已完成 (2024-08-06)
+    - [x] 修改 `src/components/aggregation/ConfigForm.tsx` 以使用 Jotai 直接更新状态：
+      - [x] 创建/更新操作修改为直接更新 `aggregatedViewsAtom`。 - 已完成 (2024-08-06)
+      - [x] 生成 ID, createdAt, updatedAt 等字段的逻辑移至前端。 - 已完成 (2024-08-06)
+  - [ ] **同步机制调整**：
+    - [x] 将现有的与后端的 API 调用逻辑封装为可选的同步功能，仅在用户登录且网络可用时执行。 - 已完成 (2024-08-06)
+    - [x] 在本地操作后尝试进行后台同步，对同步失败设计合理的降级策略和错误处理。 - 已完成 (2024-08-06)
+    - [ ] 考虑添加同步状态指示器，让用户了解其配置是仅保存在本地还是已成功同步到服务器。
+
+- [ ] **阶段五：测试、优化与文档**
+  - [ ] **全面测试**：
+    - [ ] 创建、编辑、激活、删除聚合配置的完整流程。
+      - [ ] 验证聚合配置的本地持久化（增删改查操作后检查 localStorage 及刷新后数据是否保留）。
+    - [ ] 从菜单导航到聚合新闻页面，并正确展示对应配置的新闻。
+    - [ ] 聚合新闻按时间正确排序，来源清晰显示。
+    - [ ] 多设备数据同步。
+    - [ ] 边缘情况测试。
+    - [ ] **优化** 对不同网络条件的适应性测试（断网恢复、慢网络）。
+    - [ ] **优化** 测试缓存策略的有效性与一致性。
+  - [ ] **代码审查与优化**。
+    - [ ] **优化** 代码分割和懒加载：使用 React.lazy 和 Suspense 懒加载聚合页面以减少初始加载体积。
+    - [ ] **优化** 实现渲染性能优化：
+      - 对长列表使用窗口化（windowing）或虚拟滚动。
+      - 通过 React.memo 和 useMemo/useCallback 减少不必要的重渲染。
+
+- [x] 分析普通新闻卡片与聚合新闻卡片刷新不一致的问题
+  - [x] 梳理普通新闻卡片的数据获取与刷新逻辑
+  - [x] 梳理聚合新闻卡片的数据获取与刷新逻辑
+  - [x] 对比两种卡片的数据处理逻辑，找出差异点
+  - [x] 分析后端缓存机制对两种卡片刷新的影响
+  - [x] **简化方案：聚合 API `latest` 强制刷新机制**
+    - [x] 前端：修改 `useAggregatedFeedQuery` 以在刷新时传递 `force` 信号给 `fetchAggregatedFeed`
+    - [x] 前端：修改 `fetchAggregatedFeed` 以在 `force` 为 true 时向 `/api/s/aggregate` 请求附加 `&latest=true`
+    - [x] 后端：修改 `/api/s/aggregate` 的 `getKey` (Nitro缓存)，以便在 `latest=true` 时绕过缓存
+    - [x] 后端：修改 `/api/s/aggregate` 内部逻辑，在获取子新闻源数据时透传 `latest` 参数
+    - [x] 后端：修改 `SourceGetter` 类型定义，使其接受 `forceRefresh?: boolean` 参数
+  - [x] 测试方案的有效性
+    - [x] 测试聚合卡片刷新后是否能获取到最新的新闻数据
+    - [x] 对比聚合卡片与普通卡片的刷新结果一致性
+  - [x] 修复聚合卡片预览模式数据获取问题
+    - [x] 修改 `AggregationCard.tsx`，使用与详细视图相同的数据获取方式
+    - [x] 添加初始化时自动强制刷新功能

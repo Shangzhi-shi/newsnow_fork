@@ -63,4 +63,4 @@ export interface SourceOption {
   hiddenDate?: boolean
 }
 
-export type SourceGetter = () => Promise<NewsItem[]>
+export type SourceGetter = (forceRefresh?: boolean) => Promise<NewsItem[]>

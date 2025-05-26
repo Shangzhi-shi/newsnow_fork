@@ -3,30 +3,33 @@ import { typeSafeObjectEntries, typeSafeObjectFromEntries } from "./type.util"
 import type { ColumnID, HiddenColumnID, Metadata, SourceID } from "./types"
 
 export const columns = {
-  china: {
+  "china": {
     zh: "国内",
   },
-  world: {
+  "world": {
     zh: "国际",
   },
-  tech: {
+  "tech": {
     zh: "科技",
   },
-  finance: {
+  "finance": {
     zh: "财经",
   },
-  focus: {
+  "focus": {
     zh: "关注",
   },
-  realtime: {
+  "my-aggregations": {
+    zh: "我的聚合",
+  },
+  "realtime": {
     zh: "实时",
   },
-  hottest: {
+  "hottest": {
     zh: "最热",
   },
 } as const
 
-export const fixedColumnIds = ["focus", "hottest", "realtime", "tech", "china", "world", "finance"] as const satisfies Partial<ColumnID>[]
+export const fixedColumnIds = ["focus", "my-aggregations", "hottest", "realtime", "tech", "china", "world", "finance"] as const satisfies Partial<ColumnID>[]
 export const hiddenColumns = Object.keys(columns).filter(id => !fixedColumnIds.includes(id as any)) as HiddenColumnID[]
 
 export const metadata: Metadata = typeSafeObjectFromEntries(typeSafeObjectEntries(columns).map(([k, v]) => {
