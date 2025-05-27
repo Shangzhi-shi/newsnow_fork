@@ -1,113 +1,102 @@
-import type { AggregatedViewConfig, PrimitiveMetadata } from "@shared/types"
+import type { PrimitiveMetadata } from "@shared/types"
 import { useDebounce, useMount } from "react-use"
+import { useRef } from "react"
+import { useAtom } from "jotai"
 import { useLogin } from "./useLogin"
 import { useToast } from "./useToast"
-import { safeParseString } from "~/utils"
+import { myFetch, safeParseString } from "~/utils"
+import { primitiveMetadataAtom } from "~/atoms"
+import { preprocessMetadata } from "~/atoms/primitiveMetadataAtom"
 
-async function uploadMetadata(metadata: PrimitiveMetadata) {
-  const jwt = safeParseString(localStorage.getItem("jwt"))
-  if (!jwt) return
-  await myFetch("/me/sync", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${jwt}`,
-    },
-    body: {
-      data: metadata.data,
-      updatedTime: metadata.updatedTime,
+/**
+ * 从本地存储获取JWT令牌
+ * @returns JWT令牌或undefined
+ */
+function getJWT(): string | undefined {
+  return safeParseString(localStorage.getItem("jwt"))
+}
+
+/**
+ * 处理同步过程中的错误
+ * @param error 捕获的错误
+ * @param logout 登出函数
+ * @param login 登录函数
+ * @param toaster 提示函数
+ * @returns true表示错误已处理，false表示是状态码506（忽略处理）
+ */
+function handleSyncError(error: any, logout: () => void, login: () => void, toaster: any): boolean {
+  if (error.statusCode === 506) {
+    return false
+  }
+
+  toaster("身份校验失败，无法同步，请重新登录", {
+    type: "error",
+    action: {
+      label: "登录",
+      onClick: login,
     },
   })
+  logout()
+  return true
+}
 
-  // 同步聚合视图配置
-  // 从localStorage获取聚合视图配置
-  const aggregatedViewsConfig = safeParseString(localStorage.getItem("aggregated-views-config"))
-  if (aggregatedViewsConfig) {
-    try {
-      await myFetch("/me/aggregated-views", {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${jwt}`,
-        },
-      })
+/**
+ * 上传完整的元数据到服务器
+ * 通过单一API请求同步所有数据，包括聚合视图配置
+ */
+async function uploadMetadata(metadata: PrimitiveMetadata, logout: () => void, login: () => void, toaster: any) {
+  const jwt = getJWT()
+  if (!jwt) return
 
-      // 针对每个本地聚合视图配置，检查是否需要在服务器上创建或更新
-      for (const config of aggregatedViewsConfig) {
-        try {
-          // 尝试更新或创建配置
-          await myFetch(`/me/aggregated-views${config.id ? `/${config.id}` : ""}`, {
-            method: config.id ? "PUT" : "POST",
-            headers: {
-              Authorization: `Bearer ${jwt}`,
-            },
-            body: {
-              name: config.name,
-              sources: config.sources,
-            },
-          })
-        } catch (error) {
-          console.error(`同步聚合视图配置失败: ${config.id || "new"}`, error)
-        }
-      }
-    } catch (error) {
-      console.error("获取远程聚合视图配置失败", error)
-    }
+  try {
+    // 上传完整元数据，包括聚合视图配置
+    await myFetch("/me/sync", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${jwt}`,
+      },
+      body: {
+        data: metadata.data,
+        updatedTime: metadata.updatedTime,
+        aggregatedViews: metadata.aggregatedViews || [],
+        pinnedColumns: metadata.pinnedColumns || [],
+      },
+    })
+  } catch (e: any) {
+    handleSyncError(e, logout, login, toaster)
   }
 }
 
-async function downloadMetadata(): Promise<PrimitiveMetadata | undefined> {
-  const jwt = safeParseString(localStorage.getItem("jwt"))
+/**
+ * 从服务器下载完整的元数据
+ * 包括聚合视图配置和其他用户设置
+ */
+async function downloadMetadata(logout: () => void, login: () => void, toaster: any): Promise<PrimitiveMetadata | undefined> {
+  const jwt = getJWT()
   if (!jwt) return
-  const { data, updatedTime } = await myFetch("/me/sync", {
-    headers: {
-      Authorization: `Bearer ${jwt}`,
-    },
-  }) as PrimitiveMetadata
-  // 不用同步 action 字段
-  if (data) {
-    // 下载聚合视图配置
-    try {
-      const serverAggregatedViewsConfig = await myFetch("/me/aggregated-views", {
-        headers: {
-          Authorization: `Bearer ${jwt}`,
-        },
-      }) as AggregatedViewConfig[]
 
-      // "本地优先"的合并逻辑
-      if (Array.isArray(serverAggregatedViewsConfig)) {
-        const localConfigString = localStorage.getItem("aggregated-views-config")
-        let localConfigs: AggregatedViewConfig[] = []
-        if (localConfigString) {
-          try {
-            localConfigs = JSON.parse(localConfigString)
-            if (!Array.isArray(localConfigs)) {
-              localConfigs = [] // 如果解析结果不是数组，则重置
-            }
-          } catch (e) {
-            console.error("解析本地聚合视图配置失败", e)
-            localConfigs = [] // 解析失败则重置
-          }
-        }
+  try {
+    // 下载完整元数据
+    const response = await myFetch("/me/sync", {
+      headers: {
+        Authorization: `Bearer ${jwt}`,
+      },
+    })
 
-        const localConfigIds = new Set(localConfigs.map(c => c.id))
-        const configsToAdd = serverAggregatedViewsConfig.filter(serverConfig => !localConfigIds.has(serverConfig.id))
+    const { data, updatedTime, aggregatedViews, pinnedColumns } = response
 
-        if (configsToAdd.length > 0) {
-          const mergedConfigs = [...localConfigs, ...configsToAdd]
-          localStorage.setItem("aggregated-views-config", JSON.stringify(mergedConfigs))
-          // 注意：这里直接修改了localStorage，Jotai的atomWithStorage可能需要重新初始化或手动更新其状态
-          // 一个更健壮的方法是更新Jotai atom，让它来处理localStorage的更新。
-          // 但基于当前代码结构，我们先直接修改localStorage。后续可以优化。
-        }
+    // 不用同步 action 字段
+    if (data) {
+      return {
+        action: "sync",
+        data,
+        updatedTime,
+        aggregatedViews: Array.isArray(aggregatedViews) ? aggregatedViews : [],
+        pinnedColumns: Array.isArray(pinnedColumns) ? pinnedColumns : [],
       }
-    } catch (error) {
-      console.error("下载或合并聚合视图配置失败", error)
     }
-
-    return {
-      action: "sync",
-      data,
-      updatedTime,
-    }
+  } catch (e: any) {
+    handleSyncError(e, logout, login, toaster)
   }
 }
 
@@ -115,49 +104,41 @@ export function useSync() {
   const [primitiveMetadata, setPrimitiveMetadata] = useAtom(primitiveMetadataAtom)
   const { logout, login } = useLogin()
   const toaster = useToast()
+  const lastSyncedRef = useRef<string>("")
+
+  // 将当前元数据转换为字符串，用于比较是否变化
+  const metadataString = JSON.stringify({
+    data: primitiveMetadata.data,
+    aggregatedViews: primitiveMetadata.aggregatedViews,
+    pinnedColumns: primitiveMetadata.pinnedColumns,
+  })
 
   useDebounce(async () => {
-    const fn = async () => {
+    // 仅在手动触发同步且数据发生变化时上传
+    if (primitiveMetadata.action === "manual" && metadataString !== lastSyncedRef.current) {
+      await uploadMetadata(primitiveMetadata, logout, login, toaster)
+      lastSyncedRef.current = metadataString
+    }
+  }, 10000, [primitiveMetadata, metadataString])
+
+  useMount(() => {
+    const loadInitialData = async () => {
       try {
-        await uploadMetadata(primitiveMetadata)
-      } catch (e: any) {
-        if (e.statusCode !== 506) {
-          toaster("身份校验失败，无法同步，请重新登录", {
-            type: "error",
-            action: {
-              label: "登录",
-              onClick: login,
-            },
+        const metadata = await downloadMetadata(logout, login, toaster)
+        if (metadata) {
+          setPrimitiveMetadata(preprocessMetadata(metadata))
+          // 初始化同步标记
+          lastSyncedRef.current = JSON.stringify({
+            data: metadata.data,
+            aggregatedViews: metadata.aggregatedViews,
+            pinnedColumns: metadata.pinnedColumns,
           })
-          logout()
         }
+      } catch (e) {
+        console.error("初始数据加载失败", e)
       }
     }
 
-    if (primitiveMetadata.action === "manual") {
-      fn()
-    }
-  }, 10000, [primitiveMetadata])
-  useMount(() => {
-    const fn = async () => {
-      try {
-        const metadata = await downloadMetadata()
-        if (metadata) {
-          setPrimitiveMetadata(preprocessMetadata(metadata))
-        }
-      } catch (e: any) {
-        if (e.statusCode !== 506) {
-          toaster("身份校验失败，无法同步，请重新登录", {
-            type: "error",
-            action: {
-              label: "登录",
-              onClick: login,
-            },
-          })
-          logout()
-        }
-      }
-    }
-    fn()
+    loadInitialData()
   })
 }

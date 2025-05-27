@@ -72,6 +72,8 @@ export interface PrimitiveMetadata {
   pinnedColumns?: ColumnID[]
   /** 数据操作类型：初始化、手动更新或同步 */
   action: "init" | "manual" | "sync"
+  /** 用户自定义的聚合视图配置 */
+  aggregatedViews?: AggregatedViewConfig[]
 }
 
 /**
